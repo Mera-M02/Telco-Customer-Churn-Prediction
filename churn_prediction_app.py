@@ -36,3 +36,69 @@ contract = st.selectbox("Contract Type", options=["Month-to-month", "One year", 
 paperless = st.selectbox("Paperless Billing?", options=["No", "Yes"])
 payment_method = st.selectbox("Payment Method", options=["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"])
 
+# turn the inputs into 30 features for the model
+
+def build_features():
+    #start every feature at 0, then set the ones that apply to 1
+    row = dict.fromkeys(feature_names, 0)
+
+    #the three numeric features
+    row['tenure'] = tenure
+    row['monthly_charges'] = monthly_charges
+    row['total_charges'] = total_charges
+
+    #simplify the categorical features into binary features
+    if gender == "Male": row['gender_Male'] = 1
+    if senior == "Yes": row['senior_citizen_Yes'] = 1
+    if partner == "Yes": row['partner_Yes'] = 1
+    if dependents == "Yes": row['dependents_Yes'] = 1
+    if phone == "Yes": row['phone_service_Yes'] = 1
+
+    #multiple lines depends on phone service
+    if phone == "No":
+        row['multiple_lines_No phone service'] = 1
+    elif multiple == "Yes":
+        row['multiple_lines_Yes'] = 1
+
+    #internet service type
+    if internet == "Fiber optic":
+        row['internet_service_Fiber optic'] = 1
+    elif internet == "No":
+        row['internet_service_No'] = 1
+    
+    #the six services that depend on internet service
+    services = {
+        'online_security': online_security,
+        'online_backup': online_backup,
+        'device_protection': device_protection,
+        'tech_support': tech_support,
+        'streaming_tv': stream_tv,
+        'streaming_movies': stream_movies
+    }
+
+    for name, value in services.items():
+        if internet == "No":
+            row[f"{name}_No internet service"] = 1
+        elif value == "Yes":
+            row[f"{name}_Yes"] = 1
+
+    #contract type
+    if contract == "One year":
+        row['contract_One year'] = 1
+    elif contract == "Two year":
+        row['contract_Two year'] = 1 
+    
+    #paperless billing
+    if paperless == "Yes":
+        row['paperless_billing_Yes'] = 1
+    
+    #payment method
+    if payment_method == "credit card (automatic)":
+        row['payment_method_Credit card (automatic)'] = 1
+    elif payment_method == "electronic check":
+        row['payment_method_Electronic check'] = 1
+    elif payment_method == "mailed check":
+        row['payment_method_Mailed check'] = 1
+
+    return pd.DataFrame([row])[feature_names]  # ensure the order of columns matches the training data
+
