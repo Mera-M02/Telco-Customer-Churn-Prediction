@@ -102,3 +102,21 @@ def build_features():
 
     return pd.DataFrame([row])[feature_names]  # ensure the order of columns matches the training data
 
+# Predict button
+if st.button("Predict Churn"):
+    # build and scale the input same as training data
+    X_input = build_features()
+    X_scaled = scaler.transform(X_input)
+
+    # make prediction
+    prediction = model.predict(X_scaled)[0]
+    probability = model.predict_proba(X_scaled)[0][1]  # probability of churn
+
+    # Display the result
+    st.header("Prediction Result")
+    if prediction == 1:
+        st.error(f"The customer is likely to churn."
+                f"(Churn Probability: {probability:.0%})")
+    else:
+        st.success(f"The customer is not likely to churn."
+                f"(Churn Probability: {probability:.0%})")
