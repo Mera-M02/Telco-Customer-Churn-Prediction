@@ -122,23 +122,23 @@ if st.button("Predict Churn"):
                 f"(Churn Probability: {probability:.0%})")
 
 #show the main factors behind the prediction
-st.subheader("Main Factors Behind the Prediction")
-try:
-    import shap
-    import numpy as np
-    explainer = shap.TreeExplainer(model)
-    shap_values = np.array(explainer.shap_values(X_scaled))
-    if shap_values.ndim == 3:  # For multi-class classification, take the values for the positive class
-        shap_values = shap_values[:,:,1]
+    st.subheader("Main Factors Behind the Prediction")
+    try:
+        import shap
+        import numpy as np
+        explainer = shap.TreeExplainer(model)
+        shap_values = np.array(explainer.shap_values(X_scaled))
+        if shap_values.ndim == 3:  # For multi-class classification, take the values for the positive class
+            shap_values = shap_values[:,:,1]
 
-    #pair each feature with its impact and show top 5 by size
-    feature_impact = pd.Series(shap_values[0], index=feature_names)
-    top_features = feature_impact.reindex(feature_impact.abs().sort_values(ascending=False).index).head(5)
+        #pair each feature with its impact and show top 5 by size
+        feature_impact = pd.Series(shap_values[0], index=feature_names)
+        top_features = feature_impact.reindex(feature_impact.abs().sort_values(ascending=False).index).head(5)
 
-    st.write("These factors had the most impact on the prediction - ( positive = pushes towards churn, negative = pushes away from churn ):")
+        st.write("These factors had the most impact on the prediction - ( positive = pushes towards churn, negative = pushes away from churn ):")
     
-    for feature, value in top_features.items():
-        direction = "towards churn" if value > 0 else "away from churn"
-        st.write(f"{feature}: ({direction})")
-except Exception as e:
-    st.write("(SHAP analysis could not be performed.", e,")")
+        for feature, value in top_features.items():
+            direction = "towards churn" if value > 0 else "away from churn"
+            st.write(f"{feature}: ({direction})")
+    except Exception as e:
+        st.write("(SHAP analysis could not be performed.", e,")")
