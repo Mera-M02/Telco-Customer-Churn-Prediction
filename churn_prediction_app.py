@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# Shared preprocessing. The analysis notebook imports this same module for its
-# system tests, so the app and the tests cannot drift apart.
+#the notebook tests import this same file so the encoding can't go out of sync
 from churn_features import build_features, FORM_OPTIONS
 
 model = joblib.load('churn_model.pkl')
@@ -16,8 +15,7 @@ try:
 except Exception:
     THRESHOLD = 0.5
 
-# Background sample for SHAP. Needed for linear models; optional so the app
-# still runs (without explanations) if the file is missing.
+#SHAP needs this to explain a logistic regression, the app still runs
 try:
     shap_background = joblib.load('shap_background.pkl')
 except Exception:
@@ -56,8 +54,7 @@ contract = st.selectbox("Contract Type", options=FORM_OPTIONS["contract"])
 paperless = st.selectbox("Paperless Billing?", options=FORM_OPTIONS["paperless"])
 payment_method = st.selectbox("Payment Method", options=FORM_OPTIONS["payment_method"])
 
-# Total charges should be roughly tenure multiplied by monthly charges. A wildly
-# inconsistent entry produces a confident but meaningless prediction, so warn.
+# Total charges should be roughly tenure multiplied by monthly charges
 if tenure > 0:
     expected_total = tenure * monthly_charges
     if expected_total > 0 and not (0.5 * expected_total <= total_charges <= 1.5 * expected_total):
@@ -127,7 +124,8 @@ if st.button("Predict Churn"):
         shap_values = np.array(explainer.shap_values(X_scaled))
         if shap_values.ndim == 3:
             shap_values = shap_values[:, :, 1]
-
+    
+        #pair each feature with its impact and show top 5 by size
         feature_impact = pd.Series(shap_values[0], index=feature_names)
         top_features = feature_impact.reindex(
             feature_impact.abs().sort_values(ascending=False).index

@@ -1,7 +1,5 @@
 import pandas as pd
-
-# The options offered by the application's form. Kept here so the encoding
-# logic below and the widgets in the app cannot fall out of step.
+#the choices shown in the app's dropdowns
 FORM_OPTIONS = {
     "gender": ["Male", "Female"],
     "senior": ["No", "Yes"],
@@ -26,8 +24,8 @@ FORM_OPTIONS = {
     ],
 }
 
-# The six add-on services that are only available with internet, mapped from
-# the input key used in the form to the column prefix used in training.
+# The six add-on services that are only available with internet
+
 INTERNET_SERVICES = {
     "online_security": "Online Security",
     "online_backup": "Online Backup",
@@ -47,8 +45,7 @@ def build_features(inputs, feature_names):
     row["Monthly Charges"] = inputs["monthly_charges"]
     row["Total Charges"] = inputs["total_charges"]
 
-    # Simple binary features. The omitted category is the reference level
-    # dropped by get_dummies(drop_first=True) during training.
+
     if inputs["gender"] == "Male":
         row["Gender_Male"] = 1
     if inputs["senior"] == "Yes":
@@ -60,7 +57,7 @@ def build_features(inputs, feature_names):
     if inputs["phone"] == "Yes":
         row["Phone Service_Yes"] = 1
 
-    # Multiple lines depends on whether there is phone service at all
+    #multiple lines depends on having phone service first
     if inputs["phone"] == "No":
         row["Multiple Lines_No phone service"] = 1
     elif inputs["multiple"] == "Yes":
@@ -72,8 +69,7 @@ def build_features(inputs, feature_names):
     elif inputs["internet"] == "No":
         row["Internet Service_No"] = 1
 
-    # Add-on services. Without internet, every one takes the
-    # 'No internet service' level rather than 'No'.
+    #with no internet these get "No internet service" instead of just "No"
     for key, column in INTERNET_SERVICES.items():
         if inputs["internet"] == "No":
             row[f"{column}_No internet service"] = 1
