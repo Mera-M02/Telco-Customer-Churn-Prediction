@@ -2,143 +2,143 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# Load the saved model
+# Shared preprocessing. The analysis notebook imports this same module for its
+# system tests, so the app and the tests cannot drift apart.
+from churn_features import build_features, FORM_OPTIONS
+
 model = joblib.load('churn_model.pkl')
 scaler = joblib.load('scaler.pkl')
-feature_names = joblib.load('feature_names.pkl')    
+feature_names = joblib.load('feature_names.pkl')
+
+# Business-derived decision threshold from Section 16B of the notebook.
+try:
+    THRESHOLD = joblib.load('threshold.pkl')
+except Exception:
+    THRESHOLD = 0.5
+
+# Background sample for SHAP. Needed for linear models; optional so the app
+# still runs (without explanations) if the file is missing.
+try:
+    shap_background = joblib.load('shap_background.pkl')
+except Exception:
+    shap_background = None
 
 st.title("Customer Churn Prediction App")
-st.write("Enter customer details below to predict whether the customer is likely to churn or not, and see the main factors behind the prediction.")
+st.write("Enter customer details below to predict whether the customer is likely "
+         "to churn or not, and see the main factors behind the prediction.")
 st.header("Customer Details")
 
-# Create input fields for customer details
-tenure = st.number_input("Tenure (months with the company)", min_value=0, max_value=100, value=12)
-monthly_charges = st.number_input("Monthly Charges", min_value=0.0, max_value=2000.0, value=70.00)
-total_charges = st.number_input("Total Charges", min_value=0.0, max_value=100000.0, value=800.00)
+tenure = st.number_input("Tenure (months with the company)",
+                         min_value=0, max_value=100, value=12)
+monthly_charges = st.number_input("Monthly Charges",
+                                  min_value=0.0, max_value=2000.0, value=70.00)
+total_charges = st.number_input("Total Charges",
+                                min_value=0.0, max_value=100000.0, value=800.00)
 
-gender = st.selectbox("Gender", options=["Male", "Female"])
-senior = st.selectbox("Senior Citizen?", options=["No", "Yes"])
-partner = st.selectbox(" Has a Partner?", options=["No", "Yes"])
-dependents = st.selectbox("Has Dependents?", options=["No", "Yes"])
+# Options come from the shared module so the form and the encoding stay in step.
+gender = st.selectbox("Gender", options=FORM_OPTIONS["gender"])
+senior = st.selectbox("Senior Citizen?", options=FORM_OPTIONS["senior"])
+partner = st.selectbox("Has a Partner?", options=FORM_OPTIONS["partner"])
+dependents = st.selectbox("Has Dependents?", options=FORM_OPTIONS["dependents"])
 
-phone = st.selectbox("Phone Service?", options=["No", "Yes"])
-multiple = st.selectbox("Multiple Lines?", options=["No", "Yes"])
+phone = st.selectbox("Phone Service?", options=FORM_OPTIONS["phone"])
+multiple = st.selectbox("Multiple Lines?", options=FORM_OPTIONS["multiple"])
 
-internet = st.selectbox("Internet Service?", options=["DSL", "Fiber optic", "No"])
-online_security = st.selectbox("Online Security?", options=["No", "Yes"])
-online_backup = st.selectbox("Online Backup?", options=["No", "Yes"])
-device_protection = st.selectbox("Device Protection?", options=["No", "Yes"])
-tech_support = st.selectbox("Tech Support?", options=["No", "Yes"])
-stream_tv = st.selectbox("Streaming TV?", options=["No", "Yes"])
-stream_movies = st.selectbox("Streaming Movies?", options=["No", "Yes"])
+internet = st.selectbox("Internet Service?", options=FORM_OPTIONS["internet"])
+online_security = st.selectbox("Online Security?", options=FORM_OPTIONS["online_security"])
+online_backup = st.selectbox("Online Backup?", options=FORM_OPTIONS["online_backup"])
+device_protection = st.selectbox("Device Protection?", options=FORM_OPTIONS["device_protection"])
+tech_support = st.selectbox("Tech Support?", options=FORM_OPTIONS["tech_support"])
+stream_tv = st.selectbox("Streaming TV?", options=FORM_OPTIONS["stream_tv"])
+stream_movies = st.selectbox("Streaming Movies?", options=FORM_OPTIONS["stream_movies"])
 
-contract = st.selectbox("Contract Type", options=["Month-to-month", "One year", "Two year"])
-paperless = st.selectbox("Paperless Billing?", options=["No", "Yes"])
-payment_method = st.selectbox("Payment Method", options=["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"])
+contract = st.selectbox("Contract Type", options=FORM_OPTIONS["contract"])
+paperless = st.selectbox("Paperless Billing?", options=FORM_OPTIONS["paperless"])
+payment_method = st.selectbox("Payment Method", options=FORM_OPTIONS["payment_method"])
 
-# turn the inputs into 30 features for the model
+# Total charges should be roughly tenure multiplied by monthly charges. A wildly
+# inconsistent entry produces a confident but meaningless prediction, so warn.
+if tenure > 0:
+    expected_total = tenure * monthly_charges
+    if expected_total > 0 and not (0.5 * expected_total <= total_charges <= 1.5 * expected_total):
+        st.warning(
+            f"Total Charges of {total_charges:,.2f} looks inconsistent with "
+            f"{tenure} months at {monthly_charges:,.2f} per month "
+            f"(roughly {expected_total:,.2f} expected). The prediction may be unreliable."
+        )
 
-def build_features():
-    #start every feature at 0, then set the ones that apply to 1
-    row = dict.fromkeys(feature_names, 0)
-
-    #the three numeric features
-    row['Tenure Months'] = tenure
-    row['Monthly Charges'] = monthly_charges
-    row['Total Charges'] = total_charges
-
-    #simplify the categorical features into binary features
-    if gender == "Male": row['Gender_Male'] = 1
-    if senior == "Yes": row['Senior Citizen_Yes'] = 1
-    if partner == "Yes": row['Partner_Yes'] = 1
-    if dependents == "Yes": row['Dependents_Yes'] = 1
-    if phone == "Yes": row['Phone Service_Yes'] = 1
-
-    #multiple lines depends on phone service
-    if phone == "No":
-        row['Multiple Lines_Yes'] = 1
-    elif multiple == "Yes":
-        row['Multiple Lines_Yes'] = 1
-
-    #internet service type
-    if internet == "Fiber optic":
-        row['Internet Service_Fiber optic'] = 1
-    elif internet == "No":
-        row['Internet Service_No'] = 1
-    
-    #the six services that depend on internet service
-    services = {
-        'online_security': online_security,
-        'online_backup': online_backup,
-        'device_protection': device_protection,
-        'tech_support': tech_support,
-        'streaming_tv': stream_tv,
-        'streaming_movies': stream_movies
+if st.button("Predict Churn"):
+    inputs = {
+        "tenure": tenure,
+        "monthly_charges": monthly_charges,
+        "total_charges": total_charges,
+        "gender": gender,
+        "senior": senior,
+        "partner": partner,
+        "dependents": dependents,
+        "phone": phone,
+        "multiple": multiple,
+        "internet": internet,
+        "online_security": online_security,
+        "online_backup": online_backup,
+        "device_protection": device_protection,
+        "tech_support": tech_support,
+        "stream_tv": stream_tv,
+        "stream_movies": stream_movies,
+        "contract": contract,
+        "paperless": paperless,
+        "payment_method": payment_method,
     }
 
-    for name, value in services.items():
-        if internet == "No":
-            row[f"{name}_No internet service"] = 1
-        elif value == "Yes":
-            row[f"{name}_Yes"] = 1
-
-    #contract type
-    if contract == "One year":
-        row['Contract_One year'] = 1
-    elif contract == "Two year":
-        row['Contract_Two year'] = 1 
-    
-    #paperless billing
-    if paperless == "Yes":
-        row['Paperless Billing_Yes'] = 1
-    
-    #payment method
-    if payment_method == "credit card (automatic)":
-        row['Payment Method_Credit card (automatic)'] = 1
-    elif payment_method == "electronic check":
-        row['Payment Method_Electronic check'] = 1
-    elif payment_method == "mailed check":
-        row['Payment Method_Mailed check'] = 1
-
-    return pd.DataFrame([row])[feature_names]  # ensure the order of columns matches the training data
-
-# Predict button
-if st.button("Predict Churn"):
-    # build and scale the input same as training data
-    X_input = build_features()
+    X_input = build_features(inputs, feature_names)
     X_scaled = scaler.transform(X_input)
 
-    # make prediction
-    prediction = model.predict(X_scaled)[0]
-    probability = model.predict_proba(X_scaled)[0][1]  # probability of churn
+    probability = model.predict_proba(X_scaled)[0][1]
+    prediction = int(probability >= THRESHOLD)
 
-    # Display the result
     st.header("Prediction Result")
     if prediction == 1:
-        st.error(f"The customer is likely to churn."
-                f"(Churn Probability: {probability:.0%})")
+        st.error(f"The customer is likely to churn. "
+                 f"(Churn Probability: {probability:.0%})")
     else:
-        st.success(f"The customer is not likely to churn."
-                f"(Churn Probability: {probability:.0%})")
+        st.success(f"The customer is not likely to churn. "
+                   f"(Churn Probability: {probability:.0%})")
+    st.caption(f"Flagged when churn probability is {THRESHOLD:.0%} or higher. "
+               f"This threshold is derived from retention cost and customer "
+               f"lifetime value rather than the conventional 50%.")
 
-#show the main factors behind the prediction
     st.subheader("Main Factors Behind the Prediction")
     try:
         import shap
         import numpy as np
-        explainer = shap.TreeExplainer(model)
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.tree import DecisionTreeClassifier
+
+        if isinstance(model, (RandomForestClassifier, DecisionTreeClassifier)):
+            explainer = shap.TreeExplainer(model)
+        elif shap_background is not None:
+            masker = shap.maskers.Independent(
+                shap_background, max_samples=shap_background.shape[0])
+            explainer = shap.LinearExplainer(model, masker)
+        else:
+            raise FileNotFoundError(
+                "shap_background.pkl is required to explain a linear model.")
+
         shap_values = np.array(explainer.shap_values(X_scaled))
-        if shap_values.ndim == 3:  # For multi-class classification, take the values for the positive class
-            shap_values = shap_values[:,:,1]
+        if shap_values.ndim == 3:
+            shap_values = shap_values[:, :, 1]
 
-        #pair each feature with its impact and show top 5 by size
         feature_impact = pd.Series(shap_values[0], index=feature_names)
-        top_features = feature_impact.reindex(feature_impact.abs().sort_values(ascending=False).index).head(5)
+        top_features = feature_impact.reindex(
+            feature_impact.abs().sort_values(ascending=False).index
+        ).head(5)
 
-        st.write("These factors had the most impact on the prediction - ( positive = pushes towards churn, negative = pushes away from churn ):")
-    
+        st.write("These factors had the most impact on the prediction "
+                 "(positive = pushes towards churn, negative = pushes away from churn):")
+
         for feature, value in top_features.items():
             direction = "towards churn" if value > 0 else "away from churn"
-            st.write(f"{feature}: ({direction})")
+            st.write(f"**{feature}**: {value:+.3f} ({direction})")
+
     except Exception as e:
-        st.write("(SHAP analysis could not be performed.", e,")")
+        st.warning(f"SHAP analysis could not be performed: {e}")
