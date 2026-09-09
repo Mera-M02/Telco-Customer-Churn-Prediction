@@ -7,7 +7,7 @@ MSc Computing Project - Mera (Student ID - 35030037)
 ---
 
 ## Overview
-Telecom customers can switch provider easily, and acquiring a new customer costs more than keeping an existing one.Many churn models focus mainly on predictive performance, leaving limited explanation for individual predictions and little guidance on which customers should be contacted.
+Telecom customers can switch provider easily, and acquiring a new customer costs more than keeping an existing one.Many churn models focus mainly on predictive performance, but this does not always explain why an individual customer is predicted to churn or help decide who should be contacted.
 
 This project trains an interpretable churn model, explains each prediction with SHAP, and sets the decision threshold from retention cost and customer lifetime value rather than the usual 0.5. It is deployed as a web application so the predictions and their reasons can be seen by the people who would use them.
 
@@ -106,6 +106,6 @@ All twelve tests pass.
 
 The recorded churn reasons show that 34.8% of customers left because of competitor offers, and the dataset holds no feature for competitor activity at all. This limits how well a model built from these features can explain competitor-related churn.
 
-The customers the model misses are also worth more on average than those it catches, so high-value accounts warrant extra scrutiny rather than relying on the flag alone.
+Some of the customers the model misses are high-value customers, so the prediction should not be used on its own when deciding who to target.
 
 ---
